@@ -74,7 +74,7 @@ else
 fi
 
 # 交互式输入域名、IP、端口和密码
-read -p "请输入域名 （trojan需要有https域名）证书文件请提前放到/etc/ssl文件夹中" DOMAIN
+read -p "请输入域名 （trojan需要有https域名）证书文件请提前放到/etc/ssl文件夹中：" DOMAIN
 if [ -z "$DOMAIN" ]; then
     echo "错误: 域名不能为空"
     exit 1
