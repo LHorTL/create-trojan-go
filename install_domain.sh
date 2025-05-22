@@ -8,13 +8,15 @@
 # RELOAD_CMD (证书更新后执行的命令)
 
 # ==== 默认证书及私钥存放路径（用户可覆盖） ====
-# Linux 系统中常见的 SSL 证书基础存放路径之一
 DEFAULT_CERT_DIR="/etc/nginx/ssl" # 证书将存放在 $CERT_DIR/$DOMAIN_NAME/
 DEFAULT_RELOAD_CMD="systemctl reload nginx" # 默认只重载 Nginx
 
 # ----------------------------------------------------
 # 以下部分通常无需修改
 # ----------------------------------------------------
+
+# acme.sh 绝对路径
+ACME_BIN="$HOME/.acme.sh/acme.sh"
 
 # ==== 提示用户输入配置信息 ====
 read -p "请输入你的 DNSPod API Id (DP_Id): " DP_Id
@@ -43,26 +45,24 @@ read -p "请输入证书更新后需要执行的重载命令 [默认: '$DEFAULT_
 RELOAD_CMD="${RELOAD_CMD:-$DEFAULT_RELOAD_CMD}"
 
 # ==== 检查 acme.sh 是否安装 ====
-if ! command -v acme.sh > /dev/null 2>&1; then
+if [ ! -f "$ACME_BIN" ]; then
   echo "acme.sh 未安装，正在尝试自动安装..."
   curl https://get.acme.sh | sh
-  # shellcheck source=/dev/null
-  source ~/.bashrc || source ~/.zshrc || source ~/.profile # 尝试加载环境变量
-  if ! command -v acme.sh > /dev/null 2>&1; then
-    echo "错误：acme.sh 安装后仍未在 PATH 中找到。请手动执行 'source ~/.bashrc' (或对应shell的配置文件) 后重试。"
-    exit 1
-  fi
-  echo "acme.sh 安装完成。"
 fi
+if [ ! -f "$ACME_BIN" ]; then
+  echo "错误：acme.sh 安装后仍未找到。请检查安装日志。"
+  exit 1
+fi
+echo "acme.sh 检测通过。"
 
 # ==== 自动切换默认 CA 到 Let's Encrypt (如果当前不是) ====
 echo "检查当前 acme.sh 默认 CA..."
-default_ca_output=$(acme.sh --get-default-ca 2>/dev/null)
+default_ca_output=$($ACME_BIN --get-default-ca 2>/dev/null)
 current_ca_name=$(echo "$default_ca_output" | awk -F': ' '/Default CA:/ {print $2}')
 
 if [[ "$current_ca_name" != "letsencrypt" && "$current_ca_name" != "LetsEncrypt.org" ]]; then
   echo "当前默认 CA 是 '$current_ca_name'，正在尝试切换到 Let's Encrypt..."
-  acme.sh --set-default-ca --server letsencrypt
+  $ACME_BIN --set-default-ca --server letsencrypt
   if [ $? -ne 0 ]; then
     echo "错误：切换默认 CA 到 Let's Encrypt 失败。请检查 acme.sh 日志。"
     echo "您也可以在申请证书时通过 --server letsencrypt 参数强制使用 Let's Encrypt。"
@@ -123,9 +123,9 @@ mkdir -p "$FULL_CERT_DIR"
 
 # ==== 申请证书 ====
 echo "开始证书申请过程..."
-echo "将执行: acme.sh --issue --dns dns_dp $DOMAIN_ARGS --debug"
+echo "将执行: $ACME_BIN --issue --dns dns_dp $DOMAIN_ARGS --debug"
 # shellcheck disable=SC2086
-acme.sh --issue --dns dns_dp $DOMAIN_ARGS --debug
+$ACME_BIN --issue --dns dns_dp $DOMAIN_ARGS --debug
 
 if [ $? -ne 0 ]; then
   echo "错误：证书申请失败。请检查上面的 acme.sh 输出日志。"
@@ -136,7 +136,7 @@ fi
 
 # ==== 自动部署证书到指定路径，并自动重载服务 ====
 echo "证书申请成功，开始安装证书到指定目录并重载服务..."
-acme.sh --install-cert -d "$DOMAIN_NAME" \
+$ACME_BIN --install-cert -d "$DOMAIN_NAME" \
   --key-file       "$FULL_CERT_DIR/$DOMAIN_NAME.key" \
   --fullchain-file "$FULL_CERT_DIR/${DOMAIN_NAME}_bundle.pem" \
   --reloadcmd "$RELOAD_CMD"
