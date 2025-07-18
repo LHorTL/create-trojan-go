@@ -110,6 +110,20 @@ KEY_FILE="${DOMAIN}.key"
 # 创建临时目录
 mkdir -p "$TEMP_DIR"
 
+# 获取架构并下载对应Trojan-Go
+ARCH=$(uname -m)
+if [[ "$ARCH" == "x86_64" || "$ARCH" == "amd64" ]]; then
+    DOWNLOAD_URL="https://github.com/p4gefau1t/trojan-go/releases/latest/download/trojan-go-linux-amd64.zip"
+elif [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
+    DOWNLOAD_URL="https://github.com/p4gefau1t/trojan-go/releases/download/v0.10.6/trojan-go-linux-arm.zip"
+else
+    echo "不支持的架构: $ARCH"
+    exit 1
+fi
+
+echo "检测到系统架构: $ARCH"
+echo "将下载: $DOWNLOAD_URL"
+
 # 下载trojan-go
 echo "从 $DOWNLOAD_URL 下载trojan-go..."
 curl -L -o "$TEMP_DIR/trojan-go.zip" "$DOWNLOAD_URL"
